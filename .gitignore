@@ -15,6 +15,9 @@ yarn-error.log*
 backend/.env
 backend/venv/
 /Users/froztydavie/dev/Polaris/backend/venv
+venv/
+.venv/
+*/venv/
 
 # OS junk files
 .DS_Store
