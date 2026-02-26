@@ -12,6 +12,9 @@ yarn-error.log*
 
 # Environment variables
 .env
+backend/.env
+backend/venv/
+/Users/froztydavie/dev/Polaris/backend/venv
 
 # OS junk files
 .DS_Store
