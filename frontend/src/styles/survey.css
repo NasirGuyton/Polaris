@@ -1,269 +1,112 @@
-:root {
-  --bg: #0b0f17;
-  --card: #121a27;
-  --text: #e9eef7;
-  --muted: #a7b4c7;
-  --border: rgba(255, 255, 255, 0.10);
-  --primary: #6ee7ff;
-  --danger: #ff6b6b;
-
-  /* Added */
-  --surface: rgba(255, 255, 255, 0.06);
-  --surface-2: rgba(255, 255, 255, 0.09);
-  --shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
-  --ring: rgba(110, 231, 255, 0.35);
-  --radius: 18px;
-}
-
-* { box-sizing: border-box; }
-
-html, body {
-  height: 100%;
-}
-
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  color: var(--text);
-  background: var(--bg);
+  font-family: Inter, sans-serif;
+  background: #f4f4f6;
 }
 
-/* Layout */
 .survey-shell {
   min-height: 100vh;
-  padding: 28px 14px;
-  background:
-    radial-gradient(1200px 600px at 20% 0%, rgba(110,231,255,0.18), transparent),
-    radial-gradient(900px 600px at 80% 30%, rgba(124,58,237,0.18), transparent),
-    var(--bg);
-  display: flex;
-  justify-content: center;
 }
 
-.survey-container {
+.survey-topbar {
+  padding: 20px;
+}
+
+.question-stage {
+  position: relative;
+}
+
+.stage-panel {
+  position: relative;
+  z-index: 2; /* FIX */
+  transition: all 0.3s ease;
+}
+
+.stage-exit-left {
+  transform: translateX(-80px);
+  opacity: 0;
+  pointer-events: none; /* FIX */
+}
+
+.stage-exit-right {
+  transform: translateX(80px);
+  opacity: 0;
+  pointer-events: none; /* FIX */
+}
+
+.stage-enter-right {
+  transform: translateX(80px);
+  opacity: 0;
+}
+
+.stage-enter-left {
+  transform: translateX(-80px);
+  opacity: 0;
+}
+
+.stage-enter {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+/* UI */
+
+.question-page {
+  max-width: 700px;
+  margin: 100px auto;
+}
+
+.question-title {
+  font-size: 2.5rem;
+  margin-bottom: 40px;
+}
+
+.line-input {
+  font-size: 2rem;
+  border: none;
+  border-bottom: 2px solid #ccc;
   width: 100%;
-  max-width: 720px;
-}
-
-/* Small label above the card */
-.step-label {
-  text-align: center;
-  color: var(--muted);
-  margin: 10px 0 18px;
-  font-size: 14px;
-}
-
-/* Card */
-.card {
-  background: rgba(18, 26, 39, 0.92);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 22px;
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(10px);
-}
-
-.card.welcome {
-  padding: 26px;
-}
-
-/* Text */
-.title {
-  margin: 0 0 10px;
-  font-size: 22px;
-  line-height: 1.2;
-  letter-spacing: 0.2px;
-}
-
-.subtitle {
-  margin: 0 0 18px;
-  color: var(--muted);
-  line-height: 1.5;
-}
-
-.fields { margin-top: 8px; }
-
-.field-group { margin-bottom: 16px; }
-
-.label {
-  display: block;
-  font-size: 14px;
-  color: var(--muted);
-  margin-bottom: 8px;
-}
-
-.req { color: var(--primary); margin-left: 6px; }
-
-/* Inputs */
-.input,
-.select,
-textarea {
-  width: 100%;
-  padding: 12px 12px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: rgba(255,255,255,0.04);
-  color: var(--text);
+  padding: 10px 0;
   outline: none;
-  transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
 }
 
-.input::placeholder,
-textarea::placeholder {
-  color: rgba(167, 180, 199, 0.75);
-}
-
-/* Focus ring */
-.input:focus,
-.select:focus,
-textarea:focus {
-  border-color: var(--ring);
-  box-shadow: 0 0 0 3px rgba(110,231,255,0.12);
-  background: rgba(255,255,255,0.06);
-}
-
-/* ---- Windows dropdown fix ----
-   When the dropdown opens, Windows may render options with weird colors.
-   The most reliable fix: make the option list LIGHT (dark text on light bg).
-*/
-select.select,
-select {
-  color: var(--text);
-  background-color: rgba(255,255,255,0.04);
-}
-
-/* dropdown list items */
-select option {
-  background: #e9eef7; /* light background */
-  color: #0b0f17;      /* dark text */
-}
-
-/* placeholder option (value="") */
-select option[value=""] {
-  color: #334155;
-}
-
-/* multi-select box */
-.select[multiple],
-select[multiple] {
-  min-height: 140px;
-  padding: 10px;
-}
-
-/* selected items in multi-select */
-select[multiple] option:checked {
-  background: #6ee7ff;
-  color: #0b0f17;
-}
-
-/* Buttons row */
-.actions {
-  margin-top: 18px;
+.option-list {
   display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-  align-items: center;
+  flex-direction: column;
+  gap: 15px;
 }
 
-/* Buttons */
-.btn {
-  padding: 12px 14px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: rgba(255,255,255,0.06);
-  color: var(--text);
+.choice-btn {
+  padding: 15px;
+  border-radius: 10px;
+  border: none;
+  background: white;
   cursor: pointer;
-  transition: transform 80ms ease, background 150ms ease, border-color 150ms ease, opacity 150ms ease;
+  text-align: left;
 }
 
-.btn:hover {
-  background: rgba(255,255,255,0.09);
+.choice-btn.selected {
+  background: #dcd6ff;
 }
 
-.btn:active {
-  transform: translateY(1px);
+.ok-btn {
+  margin-top: 20px;
+  padding: 10px 20px;
+  background: #7b61ff;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
 }
 
-.btn.primary {
-  border-color: rgba(110,231,255,0.35);
-  background: rgba(110,231,255,0.14);
+.back-link {
+  margin-top: 20px;
+  background: none;
+  border: none;
+  cursor: pointer;
 }
 
-.btn.primary:hover {
-  background: rgba(110,231,255,0.20);
-}
-
-.btn.secondary {
-  background: rgba(255,255,255,0.04);
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Helper text */
-.hint {
-  margin-top: 8px;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-/* Errors */
-.error {
+.error-text {
+  color: red;
   margin-top: 10px;
-  color: var(--danger);
-  font-size: 14px;
-  line-height: 1.4;
-}
-
-/* Code block (results) */
-.codeblock {
-  margin-top: 16px;
-  padding: 14px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: rgba(0, 0, 0, 0.25);
-  overflow: auto;
-  font-size: 13px;
-}
-
-/* Progress bar */
-.progress-bar-container {
-  height: 10px;
-  width: 100%;
-  background: rgba(255,255,255,0.08);
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.progress-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, rgba(110,231,255,1), rgba(124,58,237,1));
-  border-radius: 999px;
-  transition: width 0.35s ease;
-}
-
-/* Responsive */
-@media (max-width: 520px) {
-  .card {
-    padding: 18px;
-  }
-
-  .actions {
-    justify-content: space-between;
-  }
-
-  .btn {
-    width: 100%;
-  }
-
-  .actions .btn.secondary {
-    width: 40%;
-  }
-
-  .actions .btn.primary {
-    width: 58%;
-  }
 }

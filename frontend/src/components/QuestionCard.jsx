@@ -1,186 +1,215 @@
-function QuestionCard({ question, onNext, onBack, onChange, formData, canNext, error }) {
-  if (!question) return <div>Loading...</div>;
+import { useEffect, useRef } from "react";
 
-  const renderField = (field) => {
-    const value = formData[field.id] ?? (field.type === "multi-select" ? [] : "");
-    const isOptional = !!field.optional;
+function QuestionCard({
+  question,
+  formData,
+  error,
+  onNext,
+  onBack,
+  onChange,
+  isAnimating,
+}) {
+  const inputRef = useRef(null);
 
-    return (
-      <div key={field.id} className="field-group">
-        <label className="label">
-          {field.label} {!isOptional && <span className="req">*</span>}
-        </label>
+  useEffect(() => {
+    if (question?.type === "text" || question?.type === "number") {
+      inputRef.current?.focus();
+    }
+  }, [question]);
 
-        {field.type === "text" && (
-          <input
-            className="input"
-            type="text"
-            value={value}
-            onChange={(e) => onChange(field.id, e.target.value)}
-          />
-        )}
+  if (!question) return null;
 
-        {field.type === "number" && (
-          <input
-            className="input"
-            type="number"
-            value={value}
-            onChange={(e) => onChange(field.id, e.target.value)}
-          />
-        )}
+  const value =
+    formData[question.id] ?? (question.type === "multi-select" ? [] : "");
 
-        {field.type === "select" && (
-          <select
-            className="select"
-            value={value}
-            onChange={(e) => onChange(field.id, e.target.value)}
-          >
-            <option value="">Select an option</option>
-            {field.options?.map((opt) => (
-              <option key={opt} value={opt}>{opt}</option>
-            ))}
-          </select>
-        )}
+  const isOptional = !!question.optional;
 
-        {field.type === "multi-select" && (
-          <>
-            <select
-              className="select"
-              multiple
-              value={value}
-              onChange={(e) =>
-                onChange(
-                  field.id,
-                  Array.from(e.target.selectedOptions, (option) => option.value)
-                )
-              }
-            >
-              {field.options?.map((opt) => (
-                <option key={opt} value={opt}>{opt}</option>
-              ))}
-            </select>
-            {typeof field.max === "number" && (
-              <div className="hint">Select up to {field.max}.</div>
-            )}
-          </>
-        )}
-      </div>
-    );
+  const handleTextKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      onNext();
+    }
   };
 
-  // Normalize: if question has fields, treat it like a form step
-  const fields = question.fields ?? null;
-
-  // Major special case: add confidence follow-up if major selected and not Undecided
-  const majorSelected = question.type === "major" ? (formData[question.id] ?? "") : "";
-  const showMajorConfidence = question.type === "major" && majorSelected && majorSelected !== "Undecided";
-
   return (
-    <div className="card">
-      {question.label && <h2 className="title">{question.label}</h2>}
+    <div className="question-page">
+      <div className="question-copy">
+        <h1 className="question-title">
+          {question.label}
+          {!isOptional && <span className="required-mark">*</span>}
+        </h1>
 
-      {/* Fields-based steps (form/location/etc.) */}
-      {fields?.length ? (
-        <div className="fields">
-          {fields.map((f) => renderField(f))}
-        </div>
-      ) : (
-        <div className="fields">
-          {/* Single-question steps */}
-          {question.type === "select" && (
-            <select
-              className="select"
-              value={formData[question.id] ?? ""}
-              onChange={(e) => onChange(question.id, e.target.value)}
-            >
-              <option value="">Select an option</option>
-              {question.options?.map((opt) => (
-                <option key={opt} value={opt}>{opt}</option>
-              ))}
-            </select>
-          )}
+        {question.helper && (
+          <p className="question-subtitle">{question.helper}</p>
+        )}
+      </div>
 
-          {question.type === "text" && (
+      <div className="question-answer">
+        {question.type === "text" && (
+          <>
             <input
-              className="input"
+              ref={inputRef}
+              className="line-input"
               type="text"
-              value={formData[question.id] ?? ""}
+              value={value}
               onChange={(e) => onChange(question.id, e.target.value)}
+              onKeyDown={handleTextKeyDown}
+              placeholder={question.placeholder || "Type your answer..."}
             />
-          )}
 
-          {question.type === "number" && (
+            <div className="action-row">
+              <button className="ok-btn" type="button" onClick={onNext}>
+                OK
+              </button>
+            </div>
+          </>
+        )}
+
+        {question.type === "number" && (
+          <>
             <input
-              className="input"
+              ref={inputRef}
+              className="line-input"
               type="number"
-              value={formData[question.id] ?? ""}
+              value={value}
               onChange={(e) => onChange(question.id, e.target.value)}
+              onKeyDown={handleTextKeyDown}
+              placeholder={question.placeholder || "Enter a number..."}
             />
-          )}
 
-          {question.type === "multi-select" && (
-            <>
-              <select
-                className="select"
-                multiple
-                value={formData[question.id] ?? []}
-                onChange={(e) =>
-                  onChange(
-                    question.id,
-                    Array.from(e.target.selectedOptions, (option) => option.value)
-                  )
-                }
+            <div className="action-row">
+              <button className="ok-btn" type="button" onClick={onNext}>
+                OK
+              </button>
+            </div>
+          </>
+        )}
+
+        {question.type === "select" && (
+          <div className="option-list">
+            {question.options.map((opt) => (
+              <button
+                key={opt}
+                type="button"
+                className={`choice-btn ${value === opt ? "selected" : ""}`}
+                disabled={isAnimating}
+                onClick={() => {
+                  onChange(question.id, opt);
+                  setTimeout(() => onNext(), 150);
+                }}
               >
-                {question.options?.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
-                ))}
-              </select>
-              <div className="hint">Select up to 3.</div>
-            </>
-          )}
+                {opt}
+              </button>
+            ))}
+          </div>
+        )}
 
-          {question.type === "major" && (
-            <>
-              <select
-                className="select"
-                value={formData[question.id] ?? ""}
-                onChange={(e) => onChange(question.id, e.target.value)}
-              >
-                <option value="">Select an option</option>
-                {question.options?.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
-                ))}
-              </select>
+        {question.type === "multi-select" && (
+          <>
+            <div className="option-list">
+              {question.options.map((opt) => {
+                const selected = value.includes(opt);
+                const maxReached =
+                  typeof question.max === "number" &&
+                  !selected &&
+                  value.length >= question.max;
 
-              {showMajorConfidence && (
-                <div className="field-group">
-                  <label className="label">How confident are you in this choice? <span className="req">*</span></label>
-                  <select
-                    className="select"
-                    value={formData.major_confidence ?? ""}
-                    onChange={(e) => onChange("major_confidence", e.target.value)}
+                return (
+                  <button
+                    key={opt}
+                    type="button"
+                    className={`choice-btn ${selected ? "selected" : ""}`}
+                    disabled={maxReached || isAnimating}
+                    onClick={() => {
+                      if (selected) {
+                        onChange(
+                          question.id,
+                          value.filter((v) => v !== opt)
+                        );
+                      } else {
+                        onChange(question.id, [...value, opt]);
+                      }
+                    }}
                   >
-                    <option value="">Select an option</option>
-                    {["Very confident", "Somewhat confident", "Still exploring"].map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
+                    {opt}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="action-row">
+              <button className="ok-btn" type="button" onClick={onNext}>
+                Next
+              </button>
+            </div>
+          </>
+        )}
+
+        {question.type === "major" && (
+          <>
+            <div className="option-list">
+              {question.options.map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  className={`choice-btn ${
+                    formData[question.id] === opt ? "selected" : ""
+                  }`}
+                  disabled={isAnimating}
+                  onClick={() => {
+                    onChange(question.id, opt);
+
+                    if (opt === "Undecided") {
+                      setTimeout(() => onNext(), 150);
+                    }
+                  }}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+
+            {formData[question.id] &&
+              formData[question.id] !== "Undecided" && (
+                <div className="followup-block">
+                  <p className="question-subtitle followup-label">
+                    How confident are you in this choice?
+                  </p>
+
+                  <div className="option-list compact">
+                    {[
+                      "Very confident",
+                      "Somewhat confident",
+                      "Still exploring",
+                    ].map((opt) => (
+                      <button
+                        key={opt}
+                        type="button"
+                        className={`choice-btn ${
+                          formData.major_confidence === opt ? "selected" : ""
+                        }`}
+                        disabled={isAnimating}
+                        onClick={() => {
+                          onChange("major_confidence", opt);
+                          setTimeout(() => onNext(), 150);
+                        }}
+                      >
+                        {opt}
+                      </button>
                     ))}
-                  </select>
+                  </div>
                 </div>
               )}
-            </>
-          )}
-        </div>
-      )}
+          </>
+        )}
 
-      {error && <div className="error">{error}</div>}
+        {error && <div className="error-text">{error}</div>}
 
-      <div className="actions">
-        <button className="btn secondary" onClick={onBack} type="button">
-          Back
-        </button>
-        <button className="btn primary" onClick={onNext} disabled={!canNext} type="button">
-          Next
-        </button>
+        {question.id !== "role" && (
+          <button className="back-link" type="button" onClick={onBack}>
+            ← Back
+          </button>
+        )}
       </div>
     </div>
   );
