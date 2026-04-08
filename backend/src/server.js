@@ -12,7 +12,11 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.set("trust proxy", 1);
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+  })
+);
 app.use(cors({ origin: process.env.CORS_ORIGIN || "http://localhost:3000" }));
 app.use(express.json({ limit: "1mb" }));
 app.use(ipExtractor);
@@ -28,6 +32,18 @@ app.get("/health", async (req, res) => {
   } catch {
     res.status(503).json({ status: "unhealthy", error: "Database unreachable." });
   }
+});
+
+const path = require("path");
+const frontendBuild = path.join(__dirname, "../../frontend/build");
+
+app.use(express.static(frontendBuild));
+
+app.get("*", (req, res, next) => {
+  if (req.path.startsWith("/api/")) return next();
+  res.sendFile(path.join(frontendBuild, "index.html"), (err) => {
+    if (err) next();
+  });
 });
 
 app.use((req, res) => res.status(404).json({ error: "Route not found." }));
