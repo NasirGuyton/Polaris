@@ -290,6 +290,15 @@ async function seed() {
     `);
     const adminId = userResult.rows[0].id;
 
+    const existingCheck = await client.query(
+      `SELECT id FROM survey_app.surveys WHERE name = 'College Fit Survey' LIMIT 1`
+    );
+    if (existingCheck.rows.length > 0) {
+      console.log("⏭️  Survey already exists — skipping seed.");
+      await client.query("COMMIT");
+      return;
+    }
+
     const surveyResult = await client.query(`
       INSERT INTO survey_app.surveys (name, description, is_active, mode, welcome_message, thank_you_message, created_by)
       VALUES ('College Fit Survey', 'Helps find the right college fit.', true, 'both', 'Let''s Find the Right College Fit', 'Thank you!', $1)

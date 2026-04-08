@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "start": "node backend/src/server.js",
-    "build": "cd backend && npm install --production && cd ../frontend && npm install && npm run build",
+    "build": "cd backend && npm install --production && cd ../frontend && npm install && npm run build && cd ../backend && npm run migrate && npm run seed",
     "install:all": "cd backend && npm install && cd ../frontend && npm install",
     "migrate": "cd backend && npm run migrate",
     "seed": "cd backend && npm run seed",
