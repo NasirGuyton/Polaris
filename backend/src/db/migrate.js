@@ -40,7 +40,12 @@ async function migrate() {
         frontend_id VARCHAR(100) NOT NULL,
         text TEXT NOT NULL,
         type VARCHAR(50) NOT NULL,
+        frontend_type VARCHAR(50),
+        label TEXT,
+        helper TEXT,
+        placeholder TEXT,
         is_required BOOLEAN DEFAULT FALSE,
+        max_selections INTEGER,
         "order" INTEGER NOT NULL,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP

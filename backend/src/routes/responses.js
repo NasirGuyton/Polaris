@@ -3,8 +3,10 @@ const router = express.Router();
 const pool = require("../db/pool");
 const { normalizeUserType } = require("../config/userTypeMap");
 const { submissionLimiter } = require("../middleware/rateLimiter");
+const adminAuth = require("../middleware/adminAuth");
 
 const DEFAULT_SURVEY_ID = parseInt(process.env.DEFAULT_SURVEY_ID) || 1;
+const MAX_VALUE_LENGTH = 5000;
 
 router.post("/start", submissionLimiter, async (req, res) => {
   const surveyId = req.body.survey_id || DEFAULT_SURVEY_ID;
@@ -26,8 +28,12 @@ router.post("/:responseId/submit", submissionLimiter, async (req, res) => {
   const { formData, survey_id } = req.body;
   const surveyId = survey_id || DEFAULT_SURVEY_ID;
 
-  if (!formData || typeof formData !== "object") {
-    return res.status(400).json({ error: "formData is required." });
+  if (!formData || typeof formData !== "object" || Array.isArray(formData)) {
+    return res.status(400).json({ error: "formData must be a non-null object." });
+  }
+
+  if (Object.keys(formData).length > 100) {
+    return res.status(400).json({ error: "Too many fields in formData." });
   }
 
   const client = await pool.connect();
@@ -50,6 +56,31 @@ router.post("/:responseId/submit", submissionLimiter, async (req, res) => {
     const questionMap = {};
     for (const q of questionsResult.rows) {
       questionMap[q.frontend_id] = { id: q.id, is_required: q.is_required };
+    }
+
+    const missing = [];
+    for (const [fid, q] of Object.entries(questionMap)) {
+      if (!q.is_required) continue;
+      const val = formData[fid];
+      if (val === undefined || val === null) {
+        missing.push(fid);
+      } else if (typeof val === "string" && val.trim() === "") {
+        missing.push(fid);
+      } else if (Array.isArray(val) && val.length === 0) {
+        missing.push(fid);
+      }
+    }
+    if (missing.length > 0) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "Missing required fields.", fields: missing });
+    }
+
+    for (const [key, value] of Object.entries(formData)) {
+      const serialized = Array.isArray(value) ? JSON.stringify(value) : String(value ?? "");
+      if (serialized.length > MAX_VALUE_LENGTH) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ error: `Value for "${key}" exceeds maximum length.` });
+      }
     }
 
     const userType = normalizeUserType(formData.role);
@@ -80,12 +111,18 @@ router.post("/:responseId/submit", submissionLimiter, async (req, res) => {
   }
 });
 
-router.get("/:responseId", async (req, res) => {
+router.get("/:responseId", adminAuth, async (req, res) => {
   const { responseId } = req.params;
   try {
-    const response = await pool.query(`SELECT * FROM survey_app.responses WHERE id = $1`, [responseId]);
+    const response = await pool.query(
+      `SELECT id, survey_id, user_type, started_at, completed_at FROM survey_app.responses WHERE id = $1`,
+      [responseId]
+    );
     if (response.rows.length === 0) return res.status(404).json({ error: "Not found." });
-    const answers = await pool.query(`SELECT frontend_id, value, created_at FROM survey_app.answers WHERE response_id = $1`, [responseId]);
+    const answers = await pool.query(
+      `SELECT frontend_id, value, created_at FROM survey_app.answers WHERE response_id = $1`,
+      [responseId]
+    );
     res.json({ response: response.rows[0], answers: answers.rows });
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch response." });

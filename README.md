@@ -1,164 +1,175 @@
-# Project Roadmap  
-**In-House Typeform-Style Survey Feature for Project North Star Website**
+# Polaris
 
-This roadmap outlines a step-by-step plan to deliver the MVP based on the provided PRD.  
-Assumed team: 1–2 developers, designer, product owner (adjust as needed).  
-**Estimated MVP timeline**: 8–12 weeks (depending on team size and complexity).
+A college-fit survey that helps students and parents find the right school. Built with React and Express + PostgreSQL.
 
-## Phase 1: Planning and Preparation (Weeks 1–2)
+## Quick Start
 
-**Goal**: Align stakeholders, clarify requirements, mitigate early risks.
+### Prerequisites
 
-1. **Kickoff & Requirement Refinement**  
-   - Review PRD with all stakeholders  
-   - Resolve open questions (parent/student detection, compliance needs, etc.)  
-   - Prioritize MVP scope  
-   - Create initial user stories / task breakdown  
-   **Deliverables**: Updated PRD, backlog (Jira/Trello/etc.)  
-   **Time**: 2–3 days
+- Node.js 18+
+- PostgreSQL 14+
 
-2. **Tech Stack & Environment Setup**  
-   - Finalize frontend/backend/database choices  
-   - Set up repo, dev environment, basic auth  
-   - Define initial DB schema for forms/responses  
-   - Early privacy & compliance check  
-   **Deliverables**: Working repo, basic DB schema  
-   **Time**: 3–5 days
+### Backend
 
-3. **Resource & Timeline Planning**  
-   - Assign roles and responsibilities  
-   - Create sprint plan / Gantt overview  
-   - Document known risks & mitigations  
-   **Deliverables**: Sprint backlog, risk log  
-   **Time**: 1–2 days
+```bash
+cd backend
+cp .env.example .env        # edit with your DB credentials and admin key
+npm install
+npm run migrate
+npm run seed
+npm run dev                  # starts on http://localhost:3001
+```
 
-**Milestone**: Approved plan, team aligned, environment ready
+### Frontend
 
-## Phase 2: Design (Weeks 2–3)
+```bash
+cd frontend
+npm install
+npm run dev                  # starts on http://localhost:3000
+```
 
-**Goal**: Create clear blueprints for UI, flows, and architecture.
+The frontend proxies `/api` requests to the backend automatically during development.
 
-1. **User Flows & Wireframing**  
-   - Map parent vs student flows (branching logic)  
-   - Design conversational single-question UI  
-   - Include welcome screen, progress bar, thank-you screen  
-   **Deliverables**: Flow diagrams, wireframes (Figma/Sketch)  
-   **Time**: 4–5 days
+---
 
-2. **Admin Panel Design**  
-   - Form builder interface (questions, logic, settings)  
-   - Responses list, export, basic analytics view  
-   - Accessibility considerations (WCAG 2.1 AA)  
-   **Deliverables**: Admin mockups, UI component library  
-   **Time**: 3–4 days
+## Accessing Collected Data
 
-3. **Technical Design**  
-   - API endpoints specification  
-   - Database schema finalization  
-   - Embedding strategy (script tag vs iframe, Shadow DOM)  
-   - Spam & security approach  
-   **Deliverables**: API spec, ER diagram  
-   **Time**: 2–3 days
+All admin endpoints require an API key. Set `ADMIN_API_KEY` in your backend `.env`, then pass it as a header or query parameter:
 
-**Milestone**: Design sign-off from product/marketing stakeholders
+```
+Header:  x-api-key: your-secret-key
+  — or —
+Query:   ?key=your-secret-key
+```
 
-## Phase 3: Development (Weeks 4–8)
+### Export to Spreadsheet (CSV)
 
-**Goal**: Build functional MVP iteratively.
+The fastest way to get all responses into Excel or Google Sheets:
 
-**Sprint 1 – Backend Foundation**  
-- Database models (forms, questions, responses)  
-- CRUD APIs for forms  
-- Conditional logic engine  
-- Submission endpoint + basic validation  
-**Time**: ~1–2 weeks
+```
+GET http://localhost:3001/api/surveys/1/export?key=your-secret-key
+```
 
-**Sprint 2 – Form Frontend**  
-- Responsive conversational form UI  
-- Parent/student branching implementation  
-- All MVP question types  
-- Embed script/iframe generation & rendering  
-**Time**: ~1–2 weeks
+Open that URL in your browser — it downloads a CSV file where each row is one respondent and each column is a survey question. The file includes:
 
-**Sprint 3 – Admin Panel & Integration**  
-- Form builder UI  
-- Responses list + CSV export  
-- Basic analytics (views, starts, completions)  
-- Spam protection (honeypot)  
-- End-to-end flow (create → embed → submit → view)  
-**Time**: ~1–2 weeks
+| Column | Description |
+|--------|-------------|
+| Response ID | Unique identifier for each submission |
+| User Type | `student`, `parent`, or `both` |
+| Started At | When the user clicked "Start" |
+| Completed At | When the user submitted their answers |
+| *(remaining columns)* | One column per survey question, in order |
 
-**Sprint 4 (if needed) – Polish & Bug Fixing**  
-- Performance optimization (<1.5s load)  
-- Mobile testing & fixes  
-- Edge cases & error handling  
-**Time**: 0–1 week
+You can open the CSV directly in Excel, Google Sheets, or Numbers.
 
-**Milestone**: Working end-to-end MVP demo
+### View Survey Stats
 
-## Phase 4: Testing & Quality Assurance (Weeks 8–9)
+Get a quick count of how many people started, completed, or abandoned the survey:
 
-**Goal**: Ensure reliability, usability, and compliance.
+```
+GET http://localhost:3001/api/surveys/1/stats
+```
 
-1. **Internal Functional & Technical Testing**  
-   - Cross-browser + mobile testing  
-   - Accessibility checks  
-   - Load time & performance  
-   **Time**: 3–4 days
+```bash
+curl -H "x-api-key: your-secret-key" http://localhost:3001/api/surveys/1/stats
+```
 
-2. **User Acceptance Testing (UAT)**  
-   - Internal team simulates parent/student users  
-   - Measure completion rate & usability  
-   - Collect feedback  
-   **Time**: 3–4 days
+Returns:
 
-3. **Security & Compliance Review**  
-   - Vulnerability scan  
-   - PII handling confirmation  
-   - Final legal/compliance sign-off  
-   **Time**: 2–3 days
+```json
+{
+  "total_started": "12",
+  "total_completed": "8",
+  "total_incomplete": "4"
+}
+```
 
-**Milestone**: Zero critical bugs, validation criteria met
+### View a Single Response
 
-## Phase 5: Deployment & Launch (Weeks 9–10)
+Look up one respondent's full answers by their response ID:
 
-**Goal**: Go live safely and transition from third-party tool.
+```
+GET http://localhost:3001/api/responses/3
+```
 
-1. **Deployment**  
-   - Staging → Production rollout  
-   - Monitoring & error tracking setup  
-   **Time**: 2–3 days
+```bash
+curl -H "x-api-key: your-secret-key" http://localhost:3001/api/responses/3
+```
 
-2. **Training & Documentation**  
-   - Admin user training session  
-   - Create usage guide & FAQ  
-   **Time**: 2–3 days
+Returns the response metadata and all their answers:
 
-3. **Launch**  
-   - Embed on live website pages  
-   - Internal announcement  
-   - Monitor first submissions closely  
-   **Time**: 1 day
+```json
+{
+  "response": {
+    "id": 3,
+    "survey_id": 1,
+    "user_type": "student",
+    "started_at": "2026-04-06T...",
+    "completed_at": "2026-04-06T..."
+  },
+  "answers": [
+    { "frontend_id": "role", "value": "I am a student", "created_at": "..." },
+    { "frontend_id": "student_name", "value": "Jane", "created_at": "..." }
+  ]
+}
+```
 
-**Milestone**: Feature live, third-party tool no longer required
+### Query the Database Directly
 
-## Phase 6: Post-Launch & Iteration (Weeks 11+)
+If you need more flexibility, connect to PostgreSQL and query the tables directly:
 
-**Goal**: Validate success and improve over time.
+```bash
+psql -d polaris
+```
 
-1. **Monitoring & Support (first 30 days)**  
-   - Track completion rates (target ≥60–70%)  
-   - Watch for bugs & spam  
-   - Collect user feedback  
+```sql
+-- All completed responses
+SELECT id, user_type, started_at, completed_at
+FROM survey_app.responses
+WHERE completed_at IS NOT NULL
+ORDER BY completed_at DESC;
 
-2. **Quick Iterations**  
-   - Fix high-priority issues  
-   - Small UX/performance improvements  
+-- All answers for a specific response
+SELECT frontend_id, value
+FROM survey_app.answers
+WHERE response_id = 3;
 
-3. **Longer-term Backlog**  
-   - Nice-to-haves (branding, file uploads, notifications, etc.)  
-   - Re-evaluate out-of-scope items  
+-- Every answer pivoted by question (one row per respondent)
+SELECT
+  r.id,
+  r.user_type,
+  r.completed_at,
+  MAX(CASE WHEN a.frontend_id = 'student_name' THEN a.value END) AS student_name,
+  MAX(CASE WHEN a.frontend_id = 'gpa' THEN a.value END) AS gpa,
+  MAX(CASE WHEN a.frontend_id = 'intended_major' THEN a.value END) AS intended_major
+FROM survey_app.responses r
+JOIN survey_app.answers a ON a.response_id = r.id
+WHERE r.completed_at IS NOT NULL
+GROUP BY r.id
+ORDER BY r.completed_at DESC;
+```
 
-**Final Validation**  
-- All PRD success criteria met  
-- Sign-off from product owner, technical lead, legal, marketing
+---
+
+## Environment Variables
+
+### Backend (`backend/.env`)
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DB_HOST` | Yes | PostgreSQL host |
+| `DB_PORT` | Yes | PostgreSQL port (default `5432`) |
+| `DB_NAME` | Yes | Database name |
+| `DB_USER` | Yes | Database user |
+| `DB_PASSWORD` | Yes | Database password |
+| `PORT` | No | Server port (default `3001`) |
+| `CORS_ORIGIN` | No | Allowed frontend origin (default `http://localhost:3000`) |
+| `DEFAULT_SURVEY_ID` | No | Active survey ID (default `1`) |
+| `ADMIN_API_KEY` | Yes | Secret key for admin API endpoints |
+| `DB_POOL_MAX` | No | Max DB connections (default `10`) |
+
+### Frontend (`frontend/.env`)
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `REACT_APP_API_URL` | No | Backend URL for production. Leave empty when using the dev proxy or a same-origin reverse proxy. |

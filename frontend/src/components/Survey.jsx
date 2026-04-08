@@ -1,11 +1,47 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import questions from "../data/questions";
+import {
+  fetchActiveSurvey,
+  startResponse,
+  submitResponse,
+} from "../services/api";
 import QuestionCard from "./QuestionCard";
 import ProgressBar from "./ProgressBar";
 
 const TRANSITION_MS = 320;
 
+function transformQuestions(survey) {
+  const welcome = {
+    id: "welcome",
+    type: "welcome",
+    title: survey.welcome_message || "Welcome",
+    description: "This survey takes 8–10 minutes to complete.",
+    buttonText: "Start",
+  };
+
+  const mapped = survey.questions.map((q) => ({
+    id: q.frontend_id,
+    type: q.frontend_type,
+    label: q.label || q.text,
+    helper: q.helper || undefined,
+    placeholder: q.placeholder || undefined,
+    optional: !q.is_required,
+    max: q.max_selections || undefined,
+    options: q.options?.length ? q.options.map((o) => o.value) : undefined,
+  }));
+
+  const results = { id: "results", type: "results" };
+
+  return [welcome, ...mapped, results];
+}
+
 function Survey() {
+  const [survey, setSurvey] = useState(null);
+  const [questions, setQuestions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState(null);
+  const [responseId, setResponseId] = useState(null);
+  const [submitted, setSubmitted] = useState(false);
+
   const [currentIndex, setCurrentIndex] = useState(0);
   const [displayIndex, setDisplayIndex] = useState(0);
   const [formData, setFormData] = useState({});
@@ -13,6 +49,16 @@ function Survey() {
   const [stageClass, setStageClass] = useState("stage-enter");
   const [isAnimating, setIsAnimating] = useState(false);
   const firstRenderRef = useRef(true);
+
+  useEffect(() => {
+    fetchActiveSurvey()
+      .then((data) => {
+        setSurvey(data);
+        setQuestions(transformQuestions(data));
+      })
+      .catch((err) => setApiError(err.message || "Failed to load survey."))
+      .finally(() => setLoading(false));
+  }, []);
 
   useEffect(() => {
     if (firstRenderRef.current) {
@@ -49,7 +95,7 @@ function Survey() {
 
   const visibleSteps = useMemo(
     () => questions.filter((q) => q.type !== "welcome" && q.type !== "results"),
-    []
+    [questions]
   );
 
   const stepNumber = visibleSteps.findIndex((q) => q.id === question?.id) + 1;
@@ -80,7 +126,7 @@ function Survey() {
     return value !== undefined && value !== null && String(value).trim() !== "";
   };
 
-  const next = () => {
+  const next = async () => {
     if (isAnimating) return;
 
     if (!validate()) {
@@ -89,7 +135,30 @@ function Survey() {
     }
 
     setError("");
-    setCurrentIndex((i) => Math.min(i + 1, questions.length - 1));
+
+    if (question?.type === "welcome" && !responseId && survey) {
+      try {
+        const data = await startResponse(survey.id);
+        setResponseId(data.response_id);
+      } catch {
+        setError("Failed to start survey. Please try again.");
+        return;
+      }
+    }
+
+    const nextIdx = Math.min(currentIndex + 1, questions.length - 1);
+
+    if (questions[nextIdx]?.type === "results" && responseId && !submitted) {
+      try {
+        await submitResponse(responseId, formData, survey.id);
+        setSubmitted(true);
+      } catch {
+        setError("Failed to submit survey. Please try again.");
+        return;
+      }
+    }
+
+    setCurrentIndex(nextIdx);
   };
 
   const back = () => {
@@ -115,13 +184,44 @@ function Survey() {
     });
   };
 
+  if (loading) {
+    return (
+      <div className="survey-shell">
+        <div className="survey-frame">
+          <div className="question-page">
+            <h1 className="question-title">Loading survey…</h1>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (apiError) {
+    return (
+      <div className="survey-shell">
+        <div className="survey-frame">
+          <div className="question-page">
+            <h1 className="question-title">Something went wrong</h1>
+            <p className="question-subtitle">{apiError}</p>
+            <div className="action-row">
+              <button
+                className="ok-btn"
+                type="button"
+                onClick={() => window.location.reload()}
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="survey-shell">
       <div className="survey-topbar">
-        <ProgressBar
-          current={Math.max(stepNumber, 0)}
-          total={totalSteps}
-        />
+        <ProgressBar current={Math.max(stepNumber, 0)} total={totalSteps} />
       </div>
 
       <div className="survey-frame">
@@ -149,12 +249,10 @@ function Survey() {
               <div className="question-page">
                 <h1 className="question-title">Survey complete.</h1>
                 <p className="question-subtitle">
-                  Your responses are ready for review.
+                  {submitted
+                    ? "Your responses have been submitted. Thank you!"
+                    : "Your responses are ready for review."}
                 </p>
-
-                <pre className="results-block">
-                  {JSON.stringify(formData, null, 2)}
-                </pre>
 
                 <button className="back-link" type="button" onClick={back}>
                   ← Back
