@@ -203,6 +203,17 @@ const questions = [
   },
 
   {
+    id: "supporting_documents",
+    type: "file",
+    label: "Upload supporting documents",
+    helper:
+      "Please attach any files you would like us to consider, such as transcripts, test scores, class schedules, or school documents.",
+    optional: true,
+    accept: "image/*,.pdf,.doc,.docx",
+    maxSizeMB: 10,
+  },
+
+  {
     id: "final_reflection",
     type: "text",
     label: "In one sentence, what would make college successful for this student?",

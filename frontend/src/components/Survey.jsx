@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import questions from "../data/questions";
 import QuestionCard from "./QuestionCard";
 import ProgressBar from "./ProgressBar";
+import bgImage from "../assets/welcome-illustration.png";
 
 const TRANSITION_MS = 320;
 
@@ -42,8 +43,7 @@ function Survey() {
     }, TRANSITION_MS);
 
     return () => clearTimeout(swapTimer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentIndex]);
+  }, [currentIndex, displayIndex]);
 
   const question = questions[displayIndex];
 
@@ -55,40 +55,64 @@ function Survey() {
   const stepNumber = visibleSteps.findIndex((q) => q.id === question?.id) + 1;
   const totalSteps = visibleSteps.length;
 
-  const validate = () => {
+  const validateWithData = (dataToValidate) => {
     if (!question) return false;
     if (question.type === "welcome" || question.type === "results") return true;
     if (question.optional) return true;
 
-    const value = formData[question.id];
+    const value = dataToValidate[question.id];
 
     if (question.type === "multi-select") {
-      if (!Array.isArray(value) || value.length === 0) return false;
-      if (typeof question.max === "number" && value.length > question.max) {
-        return false;
-      }
-      return true;
+      return Array.isArray(value) && value.length > 0;
     }
 
     if (question.type === "major") {
-      const major = formData[question.id];
+      const major = dataToValidate[question.id];
       if (!major) return false;
-      if (major !== "Undecided" && !formData.major_confidence) return false;
+      if (major !== "Undecided" && !dataToValidate.major_confidence) {
+        return false;
+      }
       return true;
     }
 
     return value !== undefined && value !== null && String(value).trim() !== "";
   };
 
-  const next = () => {
+  const next = (instantAnswer = null) => {
     if (isAnimating) return;
 
-    if (!validate()) {
+    const dataToValidate = instantAnswer
+      ? {
+          ...formData,
+          [instantAnswer.id]: instantAnswer.value,
+        }
+      : formData;
+
+    if (!validateWithData(dataToValidate)) {
       setError("Please answer before continuing.");
       return;
     }
 
     setError("");
+
+    if (instantAnswer) {
+      setFormData((prev) => {
+        const nextState = {
+          ...prev,
+          [instantAnswer.id]: instantAnswer.value,
+        };
+
+        if (
+          instantAnswer.id === "intended_major" &&
+          instantAnswer.value === "Undecided"
+        ) {
+          delete nextState.major_confidence;
+        }
+
+        return nextState;
+      });
+    }
+
     setCurrentIndex((i) => Math.min(i + 1, questions.length - 1));
   };
 
@@ -118,10 +142,7 @@ function Survey() {
   return (
     <div className="survey-shell">
       <div className="survey-topbar">
-        <ProgressBar
-          current={Math.max(stepNumber, 0)}
-          total={totalSteps}
-        />
+        <ProgressBar current={Math.max(stepNumber, 0)} total={totalSteps} />
       </div>
 
       <div className="survey-frame">
@@ -135,13 +156,31 @@ function Survey() {
         <div className="question-stage">
           <div className={`stage-panel ${stageClass}`}>
             {question?.type === "welcome" ? (
-              <div className="question-page">
-                <h1 className="question-title">{question.title}</h1>
-                <p className="question-subtitle">{question.description}</p>
+              <div className="welcome-page">
+                <div
+                  className="welcome-bg"
+                  style={{ backgroundImage: `url(${bgImage})` }}
+                />
 
-                <div className="action-row">
-                  <button className="ok-btn" type="button" onClick={next}>
-                    {question.buttonText || "Start"}
+                <div className="welcome-content">
+                  <div className="quote-mark">“</div>
+
+                  <h1 className="welcome-title">Let’s get started.</h1>
+
+                  <p className="welcome-text">
+                    Congratulations on taking the first step! Our team at North
+                    Star is excited to help you through your college admissions
+                    journey.
+                  </p>
+
+                  <p className="welcome-text">
+                    For the best results, we recommend students and parents fill
+                    this out together. Please share as much detail as possible
+                    to help us prepare.
+                  </p>
+
+                  <button className="welcome-btn" type="button" onClick={next}>
+                    Continue
                   </button>
                 </div>
               </div>
