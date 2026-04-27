@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  fetchActiveSurvey,
-  startResponse,
-  submitResponse,
-} from "../services/api";
+import { fetchActiveSurvey } from "../services/api";
+import localQuestions from "../data/questions";
 import QuestionCard from "./QuestionCard";
 import ProgressBar from "./ProgressBar";
+import bgImage from "../assets/welcome-illustration.png";
 
-const TRANSITION_MS = 320;
+const TRANSITION_MS = 180;
 
 function transformQuestions(survey) {
   const welcome = {
@@ -26,21 +24,17 @@ function transformQuestions(survey) {
     placeholder: q.placeholder || undefined,
     optional: !q.is_required,
     max: q.max_selections || undefined,
+    accept: q.accept || undefined,
+    maxSizeMB: q.max_size_mb || 10,
     options: q.options?.length ? q.options.map((o) => o.value) : undefined,
   }));
 
-  const results = { id: "results", type: "results" };
-
-  return [welcome, ...mapped, results];
+  return [welcome, ...mapped, { id: "results", type: "results" }];
 }
 
 function Survey() {
-  const [survey, setSurvey] = useState(null);
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [apiError, setApiError] = useState(null);
-  const [responseId, setResponseId] = useState(null);
-  const [submitted, setSubmitted] = useState(false);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [displayIndex, setDisplayIndex] = useState(0);
@@ -53,43 +47,32 @@ function Survey() {
   useEffect(() => {
     fetchActiveSurvey()
       .then((data) => {
-        setSurvey(data);
         setQuestions(transformQuestions(data));
       })
-      .catch((err) => setApiError(err.message || "Failed to load survey."))
+      .catch(() => {
+        console.warn("Backend not available — using local questions.js");
+        setQuestions(localQuestions);
+      })
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
-    if (firstRenderRef.current) {
-      firstRenderRef.current = false;
-      return;
-    }
+  if (firstRenderRef.current) {
+    firstRenderRef.current = false;
+    return;
+  }
 
-    const direction = currentIndex > displayIndex ? "forward" : "backward";
+  setIsAnimating(true);
+  setStageClass("stage-slide-out");
 
-    setIsAnimating(true);
-    setStageClass(
-      direction === "forward" ? "stage-exit-left" : "stage-exit-right"
-    );
+  const timer = setTimeout(() => {
+    setDisplayIndex(currentIndex);
+    setStageClass("stage-slide-in");
+    setIsAnimating(false);
+  }, TRANSITION_MS);
 
-    const swapTimer = setTimeout(() => {
-      setDisplayIndex(currentIndex);
-      setStageClass(
-        direction === "forward" ? "stage-enter-right" : "stage-enter-left"
-      );
-
-      const settleTimer = setTimeout(() => {
-        setStageClass("stage-enter");
-        setIsAnimating(false);
-      }, 50);
-
-      return () => clearTimeout(settleTimer);
-    }, TRANSITION_MS);
-
-    return () => clearTimeout(swapTimer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentIndex]);
+  return () => clearTimeout(timer);
+}, [currentIndex]);
 
   const question = questions[displayIndex];
 
@@ -101,64 +84,69 @@ function Survey() {
   const stepNumber = visibleSteps.findIndex((q) => q.id === question?.id) + 1;
   const totalSteps = visibleSteps.length;
 
-  const validate = () => {
+  const validateWithData = (dataToValidate) => {
     if (!question) return false;
     if (question.type === "welcome" || question.type === "results") return true;
     if (question.optional) return true;
 
-    const value = formData[question.id];
+    const value = dataToValidate[question.id];
 
     if (question.type === "multi-select") {
-      if (!Array.isArray(value) || value.length === 0) return false;
-      if (typeof question.max === "number" && value.length > question.max) {
+      return Array.isArray(value) && value.length > 0;
+    }
+
+    if (question.type === "major") {
+      const major = dataToValidate[question.id];
+      if (!major) return false;
+      if (major !== "Undecided" && !dataToValidate.major_confidence) {
         return false;
       }
       return true;
     }
 
-    if (question.type === "major") {
-      const major = formData[question.id];
-      if (!major) return false;
-      if (major !== "Undecided" && !formData.major_confidence) return false;
-      return true;
+    if (question.type === "file") {
+      return !!value;
     }
 
     return value !== undefined && value !== null && String(value).trim() !== "";
   };
 
-  const next = async () => {
+  const next = (instantAnswer = null) => {
     if (isAnimating) return;
 
-    if (!validate()) {
+    const updatedData = instantAnswer
+      ? {
+          ...formData,
+          [instantAnswer.id]: instantAnswer.value,
+        }
+      : formData;
+
+    if (!validateWithData(updatedData)) {
       setError("Please answer before continuing.");
       return;
     }
 
     setError("");
 
-    if (question?.type === "welcome" && !responseId && survey) {
-      try {
-        const data = await startResponse(survey.id);
-        setResponseId(data.response_id);
-      } catch {
-        setError("Failed to start survey. Please try again.");
-        return;
-      }
+    if (instantAnswer) {
+      setFormData((prev) => {
+        const nextState = {
+          ...prev,
+          [instantAnswer.id]: instantAnswer.value,
+        };
+
+        if (
+          instantAnswer.id === "intended_major" &&
+          instantAnswer.value === "Undecided"
+        ) {
+          delete nextState.major_confidence;
+        }
+
+        return nextState;
+      });
     }
 
-    const nextIdx = Math.min(currentIndex + 1, questions.length - 1);
-
-    if (questions[nextIdx]?.type === "results" && responseId && !submitted) {
-      try {
-        await submitResponse(responseId, formData, survey.id);
-        setSubmitted(true);
-      } catch {
-        setError("Failed to submit survey. Please try again.");
-        return;
-      }
-    }
-
-    setCurrentIndex(nextIdx);
+    setCurrentIndex((i) => Math.min(i + 1, questions.length - 1));
   };
 
   const back = () => {
@@ -185,37 +173,7 @@ function Survey() {
   };
 
   if (loading) {
-    return (
-      <div className="survey-shell">
-        <div className="survey-frame">
-          <div className="question-page">
-            <h1 className="question-title">Loading survey…</h1>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (apiError) {
-    return (
-      <div className="survey-shell">
-        <div className="survey-frame">
-          <div className="question-page">
-            <h1 className="question-title">Something went wrong</h1>
-            <p className="question-subtitle">{apiError}</p>
-            <div className="action-row">
-              <button
-                className="ok-btn"
-                type="button"
-                onClick={() => window.location.reload()}
-              >
-                Try Again
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <h1 style={{ padding: 40 }}>Loading survey…</h1>;
   }
 
   return (
@@ -235,28 +193,27 @@ function Survey() {
         <div className="question-stage">
           <div className={`stage-panel ${stageClass}`}>
             {question?.type === "welcome" ? (
-              <div className="question-page">
-                <h1 className="question-title">{question.title}</h1>
-                <p className="question-subtitle">{question.description}</p>
+              <div className="welcome-page">
+                <div
+                  className="welcome-bg"
+                  style={{ backgroundImage: `url(${bgImage})` }}
+                />
 
-                <div className="action-row">
-                  <button className="ok-btn" type="button" onClick={next}>
-                    {question.buttonText || "Start"}
+                <div className="welcome-content">
+                  <h1 className="welcome-title">Let’s get started.</h1>
+
+                  <p className="welcome-text">
+                    We’re excited to help guide your college journey.
+                  </p>
+
+                  <button className="welcome-btn" onClick={next}>
+                    Continue
                   </button>
                 </div>
               </div>
             ) : question?.type === "results" ? (
               <div className="question-page">
                 <h1 className="question-title">Survey complete.</h1>
-                <p className="question-subtitle">
-                  {submitted
-                    ? "Your responses have been submitted. Thank you!"
-                    : "Your responses are ready for review."}
-                </p>
-
-                <button className="back-link" type="button" onClick={back}>
-                  ← Back
-                </button>
               </div>
             ) : (
               <QuestionCard

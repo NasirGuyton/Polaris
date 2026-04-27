@@ -58,7 +58,7 @@ function QuestionCard({
             />
 
             <div className="action-row">
-              <button className="ok-btn" type="button" onClick={onNext}>
+              <button className="ok-btn" type="button" onClick={() => onNext()}>
                 OK
               </button>
             </div>
@@ -78,7 +78,7 @@ function QuestionCard({
             />
 
             <div className="action-row">
-              <button className="ok-btn" type="button" onClick={onNext}>
+              <button className="ok-btn" type="button" onClick={() => onNext()}>
                 OK
               </button>
             </div>
@@ -94,8 +94,7 @@ function QuestionCard({
                 className={`choice-btn ${value === opt ? "selected" : ""}`}
                 disabled={isAnimating}
                 onClick={() => {
-                  onChange(question.id, opt);
-                  setTimeout(() => onNext(), 150);
+                  onNext({ id: question.id, value: opt });
                 }}
               >
                 {opt}
@@ -138,7 +137,7 @@ function QuestionCard({
             </div>
 
             <div className="action-row">
-              <button className="ok-btn" type="button" onClick={onNext}>
+              <button className="ok-btn" type="button" onClick={() => onNext()}>
                 Next
               </button>
             </div>
@@ -157,10 +156,10 @@ function QuestionCard({
                   }`}
                   disabled={isAnimating}
                   onClick={() => {
-                    onChange(question.id, opt);
-
                     if (opt === "Undecided") {
-                      setTimeout(() => onNext(), 150);
+                      onNext({ id: question.id, value: opt });
+                    } else {
+                      onChange(question.id, opt);
                     }
                   }}
                 >
@@ -190,8 +189,7 @@ function QuestionCard({
                         }`}
                         disabled={isAnimating}
                         onClick={() => {
-                          onChange("major_confidence", opt);
-                          setTimeout(() => onNext(), 150);
+                          onNext({ id: "major_confidence", value: opt });
                         }}
                       >
                         {opt}
@@ -200,6 +198,56 @@ function QuestionCard({
                   </div>
                 </div>
               )}
+          </>
+        )}
+
+        {question.type === "file" && (
+          <>
+            <label className="file-upload-box">
+              <input
+                className="file-input"
+                type="file"
+                accept={question.accept || "image/*,.pdf,.doc,.docx"}
+                onChange={(e) => {
+                  const file = e.target.files[0];
+
+                  if (!file) return;
+
+                  const maxSize = (question.maxSizeMB || 10) * 1024 * 1024;
+
+                  if (file.size > maxSize) {
+                    onChange(question.id, "");
+                    alert(
+                      `File must be smaller than ${
+                        question.maxSizeMB || 10
+                      }MB.`
+                    );
+                    return;
+                  }
+
+                  onChange(question.id, {
+                    name: file.name,
+                    size: file.size,
+                    type: file.type,
+                  });
+                }}
+              />
+
+              <div className="upload-icon">☁</div>
+
+              <div className="upload-text">
+                <strong>
+                  {value?.name ? value.name : "Choose file or drag here"}
+                </strong>
+                <span>Size limit: {question.maxSizeMB || 10}MB</span>
+              </div>
+            </label>
+
+            <div className="action-row">
+              <button className="ok-btn" type="button" onClick={() => onNext()}>
+                OK
+              </button>
+            </div>
           </>
         )}
 

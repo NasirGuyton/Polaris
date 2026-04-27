@@ -1,16 +1,34 @@
 body {
   margin: 0;
   font-family: Inter, sans-serif;
-  background: #f4f4f6;
+  background: #ffffff;
 }
+
+/* Layout */
 
 .survey-shell {
   min-height: 100vh;
+  background: #ffffff;
 }
 
 .survey-topbar {
-  padding: 20px;
+  padding: 0;
 }
+
+/* Progress Bar */
+
+.progress-bar-container {
+  width: 100%;
+  height: 4px;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: #9b8adf;
+  transition: width 0.3s ease;
+}
+
+/* Transitions */
 
 .question-stage {
   position: relative;
@@ -18,38 +36,104 @@ body {
 
 .stage-panel {
   position: relative;
-  z-index: 2; /* FIX */
-  transition: all 0.3s ease;
+  z-index: 2;
+  transition: transform 0.22s ease, opacity 0.22s ease;
 }
 
-.stage-exit-left {
-  transform: translateX(-80px);
+.stage-slide-out {
+  transform: translateX(-35px);
   opacity: 0;
-  pointer-events: none; /* FIX */
+  pointer-events: none;
 }
 
-.stage-exit-right {
-  transform: translateX(80px);
-  opacity: 0;
-  pointer-events: none; /* FIX */
-}
-
-.stage-enter-right {
-  transform: translateX(80px);
-  opacity: 0;
-}
-
-.stage-enter-left {
-  transform: translateX(-80px);
-  opacity: 0;
-}
-
+.stage-slide-in,
 .stage-enter {
   transform: translateX(0);
   opacity: 1;
 }
+/* Welcome Page */
 
-/* UI */
+.welcome-page {
+  position: relative;
+  min-height: calc(100vh - 4px);
+  display: flex;
+  align-items: center;
+  padding: 60px 90px;
+  overflow: hidden;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+/* Background Image (improved) */
+
+.welcome-bg {
+  position: absolute;
+  inset: 0;
+
+  background-position: right 60px center;
+
+  background-size: min(480px, 38vw);
+
+  background-repeat: no-repeat;
+
+  opacity: 0.85;
+  pointer-events: none;
+
+  /* smooth fade */
+  mask-image: linear-gradient(to left, black 35%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to left, black 35%, transparent 100%);
+}
+
+/* Content */
+
+.welcome-content {
+  position: relative;
+  z-index: 2;
+  max-width: 620px;
+}
+
+/* Typography */
+
+.quote-mark {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 2.5rem;
+  margin-bottom: 8px;
+  color: #111;
+}
+
+.welcome-title {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 2rem;
+  margin-bottom: 14px;
+  color: #111;
+}
+
+.welcome-text {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.3rem;
+  line-height: 1.3;
+  color: #333;
+  margin-bottom: 24px;
+}
+
+/* Button */
+
+.welcome-btn {
+  padding: 12px 28px;
+  border-radius: 999px;
+  border: none;
+  background: #6d4eea;
+  color: white;
+  cursor: pointer;
+  font-weight: 600;
+  box-shadow: 0 8px 18px rgba(109, 78, 234, 0.25);
+}
+
+.welcome-btn:hover {
+  background: #5d3fe0;
+}
+
+/* Questions */
 
 .question-page {
   max-width: 700px;
@@ -58,8 +142,15 @@ body {
 
 .question-title {
   font-size: 2.5rem;
-  margin-bottom: 40px;
+  margin-bottom: 30px;
 }
+
+.question-subtitle {
+  font-size: 1.2rem;
+  color: #555;
+}
+
+/* Inputs */
 
 .line-input {
   font-size: 2rem;
@@ -68,7 +159,10 @@ body {
   width: 100%;
   padding: 10px 0;
   outline: none;
+  background: transparent;
 }
+
+/* Options */
 
 .option-list {
   display: flex;
@@ -83,11 +177,19 @@ body {
   background: white;
   cursor: pointer;
   text-align: left;
+  font-size: 1rem;
+  transition: 0.2s ease;
+}
+
+.choice-btn:hover {
+  background: #f3f1ff;
 }
 
 .choice-btn.selected {
   background: #dcd6ff;
 }
+
+/* Buttons */
 
 .ok-btn {
   margin-top: 20px;
@@ -106,7 +208,100 @@ body {
   cursor: pointer;
 }
 
+/* Error */
+
 .error-text {
   color: red;
   margin-top: 10px;
+}
+
+/* Step Indicator */
+
+.step-chip {
+  position: fixed;
+  top: 28px;
+  right: 32px;
+  font-size: 0.9rem;
+  color: #555;
+  z-index: 10;
+}
+
+.step-chip span:first-child {
+  font-weight: 700;
+  color: #6d4eea;
+}
+
+.step-chip-text {
+  margin-left: 4px;
+}
+
+/* Results */
+
+.results-block {
+  background: #f4f4f6;
+  padding: 20px;
+  border-radius: 12px;
+  overflow-x: auto;
+}
+
+/* File Upload */
+
+.file-upload-box {
+  width: 100%;
+  min-height: 220px;
+  border: 1.5px dashed #c8c0e8;
+  border-radius: 28px;
+  background: #f7f5fc;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  cursor: pointer;
+  margin-top: 35px;
+  transition: all 0.2s ease;
+}
+
+.file-upload-box:hover {
+  background: #f0edfa;
+  border-color: #9b8adf;
+}
+
+.file-input {
+  display: none;
+}
+
+.upload-icon {
+  font-size: 4rem;
+  color: #b9b0df;
+}
+
+.upload-text {
+  text-align: center;
+  color: #333;
+}
+
+/* Mobile */
+
+@media (max-width: 900px) {
+  .welcome-page {
+    padding: 40px 24px;
+  }
+
+  .welcome-bg {
+    background-size: 360px;
+    background-position: center bottom;
+    opacity: 0.3;
+
+    mask-image: none;
+    -webkit-mask-image: none;
+  }
+
+  .question-page {
+    margin: 60px 24px;
+  }
+
+  .question-title {
+    font-size: 2rem;
+  }
 }
