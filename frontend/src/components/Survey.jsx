@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { fetchActiveSurvey } from "../services/api";
+import {
+  fetchActiveSurvey,
+  startResponse,
+  submitResponse,
+  trackResponseAbandon,
+  trackResponseProgress,
+  uploadResponseFile,
+} from "../services/api";
 import localQuestions from "../data/questions";
 import QuestionCard from "./QuestionCard";
 import ProgressBar from "./ProgressBar";
@@ -34,6 +41,8 @@ function transformQuestions(survey) {
 
 function Survey() {
   const [questions, setQuestions] = useState([]);
+  const [surveyId, setSurveyId] = useState(null);
+  const [responseId, setResponseId] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -43,10 +52,12 @@ function Survey() {
   const [stageClass, setStageClass] = useState("stage-enter");
   const [isAnimating, setIsAnimating] = useState(false);
   const firstRenderRef = useRef(true);
+  const submitInFlightRef = useRef(false);
 
   useEffect(() => {
     fetchActiveSurvey()
       .then((data) => {
+        setSurveyId(data.id);
         setQuestions(transformQuestions(data));
       })
       .catch(() => {
@@ -83,6 +94,52 @@ function Survey() {
 
   const stepNumber = visibleSteps.findIndex((q) => q.id === question?.id) + 1;
   const totalSteps = visibleSteps.length;
+  const isQuestionStep = question?.type !== "welcome" && question?.type !== "results";
+  const isResultsStep = question?.type === "results";
+
+  useEffect(() => {
+    if (!responseId || !isQuestionStep || !question?.id || !surveyId) return;
+    trackResponseProgress(responseId, {
+      survey_id: surveyId,
+      current_question_frontend_id: question.id,
+      current_question_order: stepNumber > 0 ? stepNumber : undefined,
+      event: "view",
+    }).catch(() => {
+      // Non-blocking analytics update.
+    });
+  }, [responseId, isQuestionStep, question?.id, stepNumber, surveyId]);
+
+  useEffect(() => {
+    if (!responseId || !surveyId) return;
+    if (!isResultsStep) return;
+    if (submitInFlightRef.current) return;
+    submitInFlightRef.current = true;
+
+    submitResponse(responseId, formData, surveyId).catch(() => {
+      submitInFlightRef.current = false;
+      setError("We couldn't submit your survey. Please try again.");
+    });
+  }, [responseId, surveyId, isResultsStep, formData]);
+
+  useEffect(() => {
+    if (!responseId || !surveyId) return undefined;
+
+    const handleBeforeUnload = () => {
+      if (submitInFlightRef.current) return;
+      if (currentIndex >= questions.length - 1) return;
+
+      const payload = {
+        survey_id: surveyId,
+        current_question_frontend_id: question?.id,
+        current_question_order: stepNumber > 0 ? stepNumber : undefined,
+        event: "abandon",
+      };
+      trackResponseAbandon(responseId, payload);
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [responseId, surveyId, question?.id, stepNumber, currentIndex, questions.length]);
 
   const validateWithData = (dataToValidate) => {
     if (!question) return false;
@@ -128,6 +185,18 @@ function Survey() {
 
     setError("");
 
+    if (!responseId && question?.type === "welcome") {
+      startResponse(surveyId)
+        .then((data) => {
+          setResponseId(data.response_id);
+          setCurrentIndex((i) => Math.min(i + 1, questions.length - 1));
+        })
+        .catch(() => {
+          setError("Unable to start survey. Please refresh and try again.");
+        });
+      return;
+    }
+
     if (instantAnswer) {
       setFormData((prev) => {
         const nextState = {
@@ -170,6 +239,35 @@ function Survey() {
 
       return nextState;
     });
+  };
+
+  const handleFileUpload = async (questionId, file, maxSizeMB) => {
+    if (!responseId || !surveyId) {
+      throw new Error("Survey response has not started yet.");
+    }
+
+    const maxSize = (maxSizeMB || 10) * 1024 * 1024;
+    if (file.size > maxSize) {
+      throw new Error(`File must be smaller than ${maxSizeMB || 10}MB.`);
+    }
+
+    const result = await uploadResponseFile(responseId, {
+      survey_id: surveyId,
+      question_frontend_id: questionId,
+      file,
+    });
+
+    const uploaded = result.file;
+    setFormData((prev) => ({
+      ...prev,
+      [questionId]: {
+        file_id: uploaded.id,
+        name: uploaded.original_filename,
+        size: uploaded.file_size_bytes,
+        type: uploaded.mime_type,
+        uploaded_at: uploaded.uploaded_at,
+      },
+    }));
   };
 
   if (loading) {
@@ -220,6 +318,7 @@ function Survey() {
                 question={question}
                 formData={formData}
                 onChange={handleChange}
+                onFileUpload={handleFileUpload}
                 onNext={next}
                 onBack={back}
                 error={error}

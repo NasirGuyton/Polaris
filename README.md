@@ -64,7 +64,7 @@ You can open the CSV directly in Excel, Google Sheets, or Numbers.
 
 ### View Survey Stats
 
-Get a quick count of how many people started, completed, or abandoned the survey:
+Get a quick count of how many people started, completed, or are still incomplete, plus drop-off points by question:
 
 ```
 GET http://localhost:3001/api/surveys/1/stats
@@ -80,9 +80,37 @@ Returns:
 {
   "total_started": "12",
   "total_completed": "8",
-  "total_incomplete": "4"
+  "total_incomplete": "4",
+  "drop_off_by_question": [
+    { "question_id": "gpa", "drop_off_count": 2 },
+    { "question_id": "supporting_documents", "drop_off_count": 1 }
+  ]
 }
 ```
+
+`drop_off_by_question` is based on each incomplete response's latest tracked question.
+
+### Track Incomplete Progress
+
+The frontend now tracks in-progress sessions so incomplete responses can be analyzed.
+
+```bash
+POST /api/responses/:responseId/progress
+```
+
+Payload:
+
+```json
+{
+  "survey_id": 1,
+  "current_question_frontend_id": "gpa",
+  "current_question_order": 6,
+  "event": "view"
+}
+```
+
+- `event: "view"` updates the latest step reached.
+- `event: "abandon"` marks the response as abandoned (`abandoned_at`).
 
 ### View a Single Response
 
@@ -96,7 +124,7 @@ GET http://localhost:3001/api/responses/3
 curl -H "x-api-key: your-secret-key" http://localhost:3001/api/responses/3
 ```
 
-Returns the response metadata and all their answers:
+Returns the response metadata, all answers, and uploaded file metadata:
 
 ```json
 {
@@ -110,9 +138,40 @@ Returns the response metadata and all their answers:
   "answers": [
     { "frontend_id": "role", "value": "I am a student", "created_at": "..." },
     { "frontend_id": "student_name", "value": "Jane", "created_at": "..." }
+  ],
+  "files": [
+    {
+      "id": 7,
+      "question_frontend_id": "supporting_documents",
+      "original_filename": "transcript.pdf",
+      "mime_type": "application/pdf",
+      "file_size_bytes": 483920,
+      "uploaded_at": "2026-04-30T..."
+    }
   ]
 }
 ```
+
+### Upload Supporting Files (Resume/Transcript)
+
+Users can now upload files for file-type survey questions (for example `supporting_documents`).
+
+```bash
+POST /api/responses/:responseId/files
+Content-Type: multipart/form-data
+```
+
+Form fields:
+
+- `survey_id` (number)
+- `question_frontend_id` (string, e.g. `supporting_documents`)
+- `file` (binary)
+
+Supported file types:
+
+- PDF (`.pdf`)
+- Word (`.doc`, `.docx`)
+- Excel (`.xls`, `.xlsx`)
 
 ### Query the Database Directly
 
@@ -138,6 +197,9 @@ WHERE response_id = 3;
 SELECT
   r.id,
   r.user_type,
+  r.last_question_frontend_id,
+  r.last_activity_at,
+  r.abandoned_at,
   r.completed_at,
   MAX(CASE WHEN a.frontend_id = 'student_name' THEN a.value END) AS student_name,
   MAX(CASE WHEN a.frontend_id = 'gpa' THEN a.value END) AS gpa,
@@ -147,6 +209,17 @@ JOIN survey_app.answers a ON a.response_id = r.id
 WHERE r.completed_at IS NOT NULL
 GROUP BY r.id
 ORDER BY r.completed_at DESC;
+
+-- Uploaded files for a response
+SELECT
+  response_id,
+  question_frontend_id,
+  original_filename,
+  mime_type,
+  file_size_bytes,
+  uploaded_at
+FROM survey_app.response_files
+WHERE response_id = 3;
 ```
 
 ---
