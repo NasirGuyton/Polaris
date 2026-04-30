@@ -44,12 +44,20 @@ async function migrate() {
         label TEXT,
         helper TEXT,
         placeholder TEXT,
+        accept TEXT,
+        max_size_mb INTEGER,
         is_required BOOLEAN DEFAULT FALSE,
         max_selections INTEGER,
         "order" INTEGER NOT NULL,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+    `);
+
+    await client.query(`
+      ALTER TABLE survey_app.questions
+      ADD COLUMN IF NOT EXISTS accept TEXT,
+      ADD COLUMN IF NOT EXISTS max_size_mb INTEGER;
     `);
 
     await client.query(`
@@ -78,10 +86,22 @@ async function migrate() {
         survey_id INTEGER NOT NULL REFERENCES survey_app.surveys(id) ON DELETE CASCADE,
         user_type VARCHAR(50) CHECK (user_type IN ('parent','student','both')),
         started_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        last_activity_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        last_question_frontend_id VARCHAR(100),
+        last_question_order INTEGER,
+        abandoned_at TIMESTAMP WITH TIME ZONE,
         completed_at TIMESTAMP WITH TIME ZONE,
         ip_address INET,
         is_spam BOOLEAN DEFAULT FALSE
       );
+    `);
+
+    await client.query(`
+      ALTER TABLE survey_app.responses
+      ADD COLUMN IF NOT EXISTS last_activity_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS last_question_frontend_id VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS last_question_order INTEGER,
+      ADD COLUMN IF NOT EXISTS abandoned_at TIMESTAMP WITH TIME ZONE;
     `);
 
     await client.query(`
@@ -92,6 +112,20 @@ async function migrate() {
         frontend_id VARCHAR(100) NOT NULL,
         value TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS survey_app.response_files (
+        id SERIAL PRIMARY KEY,
+        response_id INTEGER NOT NULL REFERENCES survey_app.responses(id) ON DELETE CASCADE,
+        question_frontend_id VARCHAR(100) NOT NULL,
+        original_filename TEXT NOT NULL,
+        mime_type VARCHAR(255) NOT NULL,
+        file_size_bytes INTEGER NOT NULL CHECK (file_size_bytes > 0),
+        file_data BYTEA NOT NULL,
+        uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (response_id, question_frontend_id)
       );
     `);
 
@@ -111,6 +145,40 @@ async function migrate() {
       CREATE INDEX IF NOT EXISTS idx_questions_survey_id ON survey_app.questions(survey_id);
       CREATE INDEX IF NOT EXISTS idx_responses_survey_id ON survey_app.responses(survey_id);
       CREATE INDEX IF NOT EXISTS idx_answers_response_id ON survey_app.answers(response_id);
+      CREATE INDEX IF NOT EXISTS idx_response_files_response_id ON survey_app.response_files(response_id);
+    `);
+
+    await client.query(`
+      UPDATE survey_app.questions
+      SET "order" = 27
+      WHERE survey_id = 1
+        AND frontend_id = 'final_reflection'
+        AND "order" = 26;
+    `);
+
+    await client.query(`
+      INSERT INTO survey_app.questions
+        (survey_id, frontend_id, text, type, frontend_type, label, helper, placeholder, accept, max_size_mb, is_required, max_selections, "order")
+      SELECT
+        1,
+        'supporting_documents',
+        'Upload supporting documents',
+        'file_upload',
+        'file',
+        'Upload supporting documents',
+        'Please attach a resume, transcript, or other relevant files.',
+        NULL,
+        '.pdf,.doc,.docx,.xls,.xlsx',
+        10,
+        false,
+        NULL,
+        26
+      WHERE EXISTS (SELECT 1 FROM survey_app.surveys WHERE id = 1)
+        AND NOT EXISTS (
+          SELECT 1
+          FROM survey_app.questions
+          WHERE survey_id = 1 AND frontend_id = 'supporting_documents'
+        );
     `);
 
     await client.query("COMMIT");

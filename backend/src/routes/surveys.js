@@ -19,7 +19,7 @@ router.get("/active", async (req, res) => {
 
     const questionsResult = await pool.query(
       `SELECT id, frontend_id, text, type, frontend_type, label, helper,
-              placeholder, is_required, max_selections, "order"
+              placeholder, accept, max_size_mb, is_required, max_selections, "order"
        FROM survey_app.questions
        WHERE survey_id = $1
        ORDER BY "order"`,
@@ -142,7 +142,7 @@ router.get("/:id/export", adminAuth, async (req, res) => {
 
 router.get("/:id/stats", adminAuth, async (req, res) => {
   try {
-    const result = await pool.query(
+    const totalsResult = await pool.query(
       `SELECT
          COUNT(*) AS total_started,
          COUNT(*) FILTER (WHERE completed_at IS NOT NULL) AS total_completed,
@@ -150,7 +150,22 @@ router.get("/:id/stats", adminAuth, async (req, res) => {
        FROM survey_app.responses WHERE survey_id = $1`,
       [req.params.id]
     );
-    res.json(result.rows[0]);
+
+    const dropOffResult = await pool.query(
+      `SELECT
+         COALESCE(last_question_frontend_id, '__unknown__') AS question_id,
+         COUNT(*)::INTEGER AS drop_off_count
+       FROM survey_app.responses
+       WHERE survey_id = $1 AND completed_at IS NULL
+       GROUP BY COALESCE(last_question_frontend_id, '__unknown__')
+       ORDER BY drop_off_count DESC, question_id ASC`,
+      [req.params.id]
+    );
+
+    res.json({
+      ...totalsResult.rows[0],
+      drop_off_by_question: dropOffResult.rows,
+    });
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch stats." });
   }

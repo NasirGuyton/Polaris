@@ -266,13 +266,25 @@ const QUESTIONS = [
     options: ["Yes", "No"],
   },
   {
+    frontend_id: "supporting_documents",
+    text: "Upload supporting documents",
+    label: "Upload supporting documents",
+    helper: "Please attach a resume, transcript, or other relevant files.",
+    type: "file_upload",
+    frontend_type: "file",
+    is_required: false,
+    order: 26,
+    accept: ".pdf,.doc,.docx,.xls,.xlsx",
+    max_size_mb: 10,
+  },
+  {
     frontend_id: "final_reflection",
     text: "What would make the college experience successful?",
     label: "In one sentence, what would make college successful for this student?",
     type: "long_text",
     frontend_type: "text",
     is_required: true,
-    order: 26,
+    order: 27,
     placeholder: "Type your answer here...",
   },
 ];
@@ -312,8 +324,8 @@ async function seed() {
     for (const q of QUESTIONS) {
       const questionResult = await client.query(`
         INSERT INTO survey_app.questions
-          (survey_id, frontend_id, text, type, frontend_type, label, helper, placeholder, is_required, max_selections, "order")
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          (survey_id, frontend_id, text, type, frontend_type, label, helper, placeholder, accept, max_size_mb, is_required, max_selections, "order")
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         RETURNING id
       `, [
         surveyId,
@@ -324,6 +336,8 @@ async function seed() {
         q.label,
         q.helper || null,
         q.placeholder || null,
+        q.accept || null,
+        q.max_size_mb || null,
         q.is_required,
         q.max_selections || null,
         q.order,

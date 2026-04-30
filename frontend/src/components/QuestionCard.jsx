@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 function QuestionCard({
   question,
@@ -7,9 +7,12 @@ function QuestionCard({
   onNext,
   onBack,
   onChange,
+  onFileUpload,
   isAnimating,
 }) {
   const inputRef = useRef(null);
+  const [uploadError, setUploadError] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     if (question?.type === "text" || question?.type === "number") {
@@ -207,8 +210,11 @@ function QuestionCard({
               <input
                 className="file-input"
                 type="file"
-                accept={question.accept || "image/*,.pdf,.doc,.docx"}
-                onChange={(e) => {
+                accept={
+                  question.accept ||
+                  ".pdf,.doc,.docx,.xls,.xlsx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                }
+                onChange={async (e) => {
                   const file = e.target.files[0];
 
                   if (!file) return;
@@ -217,19 +223,21 @@ function QuestionCard({
 
                   if (file.size > maxSize) {
                     onChange(question.id, "");
-                    alert(
-                      `File must be smaller than ${
-                        question.maxSizeMB || 10
-                      }MB.`
-                    );
+                    setUploadError(`File must be smaller than ${question.maxSizeMB || 10}MB.`);
                     return;
                   }
 
-                  onChange(question.id, {
-                    name: file.name,
-                    size: file.size,
-                    type: file.type,
-                  });
+                  if (!onFileUpload) return;
+
+                  setUploadError("");
+                  setIsUploading(true);
+                  try {
+                    await onFileUpload(question.id, file, question.maxSizeMB);
+                  } catch (err) {
+                    setUploadError(err.message || "Failed to upload file.");
+                  } finally {
+                    setIsUploading(false);
+                  }
                 }}
               />
 
@@ -237,21 +245,21 @@ function QuestionCard({
 
               <div className="upload-text">
                 <strong>
-                  {value?.name ? value.name : "Choose file or drag here"}
+                  {value?.name ? value.name : isUploading ? "Uploading..." : "Choose file or drag here"}
                 </strong>
                 <span>Size limit: {question.maxSizeMB || 10}MB</span>
               </div>
             </label>
 
             <div className="action-row">
-              <button className="ok-btn" type="button" onClick={() => onNext()}>
+              <button className="ok-btn" type="button" onClick={() => onNext()} disabled={isUploading}>
                 OK
               </button>
             </div>
           </>
         )}
 
-        {error && <div className="error-text">{error}</div>}
+        {(error || uploadError) && <div className="error-text">{uploadError || error}</div>}
 
         {question.id !== "role" && (
           <button className="back-link" type="button" onClick={onBack}>
